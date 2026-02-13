@@ -1,0 +1,9 @@
+*.AppImage
+*.log
+.DS_Store
+.env
+credentials.json
+*.lock
+/tmp/
+*.txt
+desktop.ini
