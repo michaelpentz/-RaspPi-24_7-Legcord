@@ -2,13 +2,20 @@
 
 set -e
 
-INSTALL_DIR="/home/schiggity/legcord"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALL_DIR="$PROJECT_ROOT/bin/legcord"
 LEGcord_URL="https://github.com/Legcord/Legcord/releases/latest/download/Legcord-linux-arm64.AppImage"
 
 echo "=== Legcord Headless Installer ==="
 
-sudo apt update
-sudo apt install -y xvfb openbox x11vnc xvfb
+if [ "$EUID" -ne 0 ]; then
+  echo "Requesting sudo for dependencies..."
+  sudo apt update
+  sudo apt install -y xvfb openbox x11vnc
+else
+  apt update
+  apt install -y xvfb openbox x11vnc
+fi
 
 mkdir -p "$INSTALL_DIR"
 
@@ -24,8 +31,13 @@ if [ ! -L "$INSTALL_DIR/legcord_current" ]; then
 fi
 
 echo "Installing crontab entries..."
-(crontab -l 2>/dev/null | grep -v "legcord"; echo "@reboot $INSTALL_DIR/../scripts/start.sh") | crontab -
-(crontab -l 2>/dev/null | grep -v "health-check"; echo "* * * * * $INSTALL_DIR/../scripts/health-check.sh") | crontab -
+START_SCRIPT="$PROJECT_ROOT/scripts/start.sh"
+HEALTH_CHECK_SCRIPT="$PROJECT_ROOT/scripts/health-check.sh"
+
+chmod +x "$START_SCRIPT" "$HEALTH_CHECK_SCRIPT"
+
+(crontab -l 2>/dev/null | grep -v "legcord"; echo "@reboot $START_SCRIPT") | crontab -
+(crontab -l 2>/dev/null | grep -v "health-check"; echo "* * * * * $HEALTH_CHECK_SCRIPT") | crontab -
 
 echo "Installation complete!"
-echo "Run ./scripts/start.sh to start Legcord"
+echo "Run $START_SCRIPT to start Legcord"

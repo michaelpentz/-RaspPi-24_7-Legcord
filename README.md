@@ -26,7 +26,7 @@ This project enables the Raspberry Pi to run a graphical application (Legcord) w
 
 ```bash
 chmod +x scripts/install.sh
-sudo ./scripts/install.sh
+./scripts/install.sh
 ```
 
 ## Usage
@@ -57,15 +57,17 @@ The installer sets up these cron jobs:
 
 ## Manual Crontab Setup
 
+Replace `/path/to/project` with your actual installation directory (e.g., `/home/pi/rasppi-24_7-legcord`).
+
 ```bash
 # Start on reboot
-@reboot /home/schiggity/legcord/scripts/start.sh
+@reboot /path/to/project/scripts/start.sh
 
 # Nightly update and reboot (2 AM)
 0 2 * * * sudo apt update && sudo apt upgrade -y && /sbin/reboot
 
 # Health check every minute
-* * * * * /home/schiggity/legcord/scripts/health-check.sh
+* * * * * /path/to/project/scripts/health-check.sh
 ```
 
 ## VNC Access

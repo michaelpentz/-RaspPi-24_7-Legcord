@@ -1,6 +1,7 @@
 #!/bin/bash
 
-INSTALL_DIR="/home/schiggity/legcord"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INSTALL_DIR="$PROJECT_ROOT/bin/legcord"
 DISPLAY_NUM=1
 
 echo "=== Starting Legcord Headless ==="
