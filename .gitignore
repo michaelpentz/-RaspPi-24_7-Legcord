@@ -2,8 +2,13 @@
 *.log
 .DS_Store
 .env
+.env.*
 credentials.json
 *.lock
 /tmp/
 *.txt
 desktop.ini
+*.db
+data/
+backups/
+.git/logs/
