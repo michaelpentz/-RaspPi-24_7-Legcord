@@ -81,7 +81,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
+Type=forking
 User=<user>
 ExecStart=/usr/bin/vncserver-virtual :1
 ExecStop=/usr/bin/vncserver-virtual -kill :1
