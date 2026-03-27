@@ -58,7 +58,7 @@ exec /home/<user>/legcord/Legcord-<version>-linux-arm64.AppImage \
     --disable-translate \
     --disable-logging \
     --no-first-run \
-    --js-flags="--max-old-space-size=128"
+    --js-flags="--max-old-space-size=192"
 ```
 
 Then apply permissions:
