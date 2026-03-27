@@ -13,3 +13,4 @@ data/
 backups/
 .git/logs/
 AGENTS.md
+.claude/
