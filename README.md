@@ -52,7 +52,6 @@ exec /home/<user>/legcord/Legcord-<version>-linux-arm64.AppImage \
     --no-sandbox \
     --disable-gpu \
     --disable-dev-shm-usage \
-    --disable-software-rasterizer \
     --disable-extensions \
     --disable-background-networking \
     --disable-sync \
