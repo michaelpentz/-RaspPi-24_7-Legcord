@@ -1,181 +1,55 @@
-# Legcord Headless Kiosk (RPi Bookworm Edition)
+# arm64-headless-presence
 
-A robust, self-healing setup for running Legcord on Raspberry Pi (3B+ and newer) using RealVNC Virtual Mode for 24/7 headless availability.
+Persistent headless client deployment on ARM64 (Raspberry Pi) with automated service management, health monitoring, and self-healing capabilities.
 
 ## Overview
 
-This project enables a Raspberry Pi to maintain a 24/7 Discord presence without a physical monitor. It uses RealVNC Virtual Mode with Openbox to run Legcord in a lightweight kiosk environment.
+Deploys and maintains a 24/7 headless application on ARM64 hardware using systemd service orchestration, VNC virtual display rendering, and automated health recovery. Built for reliability on resource-constrained edge devices.
 
-## Tech Stack
+## Architecture
 
-- **Hardware**: Raspberry Pi 3B+ / 4 / 5
-- **OS**: Raspberry Pi OS Bookworm (64-bit)
-- **Display Engine**: X11 (required for RealVNC Virtual Mode stability)
-- **Window Manager**: Openbox
-- **VNC Server**: RealVNC Server (Virtual Mode)
-- **Automation**: systemd services + cron health checks
-- **Reliability**: Hardware watchdog + memory-limited services + health monitor
+- **Platform**: Raspberry Pi 3B+/4/5 (ARM64, Bookworm 64-bit)
+- **Display**: X11 + Openbox via RealVNC Virtual Mode (no physical monitor)
+- **Process Management**: systemd with memory limits and CPU quotas
+- **Reliability**: Hardware watchdog (BCM2835), 5-minute health checks, automatic service restart
+- **Maintenance**: Unattended nightly updates and scheduled reboots
 
-## Features
+## Key Engineering Decisions
 
-1. Virtual Mode integration for stable headless operation.
-2. Direct kiosk launch (Openbox + Legcord only) for low resource usage.
-3. Automated nightly update/reboot maintenance.
-4. systemd services with memory limits (replaces fragile cron `@reboot`).
-5. Hardware watchdog for automatic recovery from system hangs.
-6. Health check script (every 5 min) restarts Legcord if memory drops below 50MB.
-7. Optimized Chromium flags to reduce memory/CPU footprint.
-8. lightdm disabled to save resources on headless setup.
+**systemd over cron @reboot**: Services are managed as proper systemd units with `MemoryMax`, `CPUQuota`, and `OOMPolicy` constraints rather than fragile cron boot scripts.
 
-## Installation
+**Hardware watchdog**: The BCM2835 watchdog timer automatically reboots the device on kernel hangs, eliminating manual intervention for edge-deployed hardware.
 
-### 1. System Preparation (Switch Wayland to X11)
+**Memory-optimized Chromium flags**: The Electron-based client runs with `--max-old-space-size=192` and disabled background services to stay within the Pi's memory budget.
 
-Raspberry Pi OS Bookworm defaults to Wayland. Switch to X11:
+## Service Configuration
 
-1. Run `sudo raspi-config`
-2. Go to `Advanced Options > Wayland`
-3. Select `X11` and reboot
+Two systemd units manage the deployment:
 
-### 2. Configure Virtual Startup
+| Service | Purpose | Memory Limit | CPU Quota |
+|---------|---------|-------------|-----------|
+| VNC Presence | Headless display + client application | 550MB (hard) / 450MB (high) | 80% |
+| Policy Enforcer | Companion message enforcement service | 100MB (hard) / 80MB (high) | Default |
 
-Create `~/.vnc/xstartup`:
+Both services auto-restart on failure with configurable backoff.
 
-```sh
-#!/bin/sh
+## Automated Maintenance
 
-# 1. Start a lightweight window manager so Legcord can render properly
-/usr/bin/openbox &
+| Schedule | Task |
+|----------|------|
+| Every 5 min | Health check: restart service if available memory drops below 50MB |
+| 02:00 daily | Unattended system updates (`apt upgrade -y`) |
+| 02:30 daily | Scheduled reboot for clean state |
 
-# 2. Launch Legcord with memory-optimized flags
-exec /home/<user>/legcord/Legcord-<version>-linux-arm64.AppImage \
-    --no-sandbox \
-    --disable-gpu \
-    --disable-dev-shm-usage \
-    --disable-extensions \
-    --disable-background-networking \
-    --disable-sync \
-    --disable-translate \
-    --disable-logging \
-    --no-first-run \
-    --js-flags="--max-old-space-size=192"
-```
+## Setup
 
-Then apply permissions:
+1. Switch display server from Wayland to X11 via `raspi-config`
+2. Configure VNC virtual display startup (`~/.vnc/xstartup`)
+3. Enable systemd services and hardware watchdog
+4. Deploy via `systemctl enable` and reboot
 
-```sh
-chmod +x ~/.vnc/xstartup
-```
+Full configuration details are documented in the source files.
 
-## Systemd Services
+## License
 
-### Legcord VNC Service
-
-`/etc/systemd/system/legcord-vnc.service`:
-
-```ini
-[Unit]
-Description=Legcord Discord Presence (VNC)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=forking
-User=<user>
-ExecStart=/usr/bin/vncserver-virtual :1
-ExecStop=/usr/bin/vncserver-virtual -kill :1
-Restart=on-failure
-RestartSec=15
-MemoryMax=550M
-MemoryHigh=450M
-CPUQuota=80%
-OOMPolicy=stop
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Discord Forward Blocker Service
-
-`/etc/systemd/system/discord-bot.service`:
-
-```ini
-[Unit]
-Description=Discord Forward Blocker Bot
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=<user>
-WorkingDirectory=/home/<user>/bot
-ExecStart=/home/<user>/bot/venv/bin/python /home/<user>/bot/discord_bot.py
-Restart=on-failure
-RestartSec=30
-MemoryMax=100M
-MemoryHigh=80M
-StandardOutput=append:/home/<user>/bot/bot.log
-StandardError=append:/home/<user>/bot/bot.log
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable both:
-
-```sh
-sudo systemctl daemon-reload
-sudo systemctl enable legcord-vnc.service discord-bot.service
-```
-
-## Hardware Watchdog
-
-Enables the Pi's built-in BCM2835 watchdog to automatically reboot on system hang:
-
-```sh
-sudo apt install watchdog
-echo "bcm2835_wdt" | sudo tee /etc/modules-load.d/watchdog.conf
-sudo systemctl enable watchdog
-```
-
-## Automation (Crontab)
-
-Edit crontab with `crontab -e` and add:
-
-```cron
-# Nightly system update (2:00 AM)
-0 2 * * * DEBIAN_FRONTEND=noninteractive /usr/bin/sudo /usr/bin/apt update -qq && DEBIAN_FRONTEND=noninteractive /usr/bin/sudo /usr/bin/apt upgrade -y -qq
-
-# Nightly reboot (2:30 AM)
-30 2 * * * /usr/bin/sudo /sbin/reboot
-
-# Health check every 5 minutes
-*/5 * * * * /usr/bin/sudo /usr/local/bin/pi-health-check.sh
-```
-
-> **Note**: Boot startup is handled by systemd services, not cron `@reboot`.
-
-## Usage
-
-### Remote Access
-
-Connect with RealVNC Viewer to your host on display `:1`:
-
-```text
-<raspberry-pi-host-or-ip>:1
-```
-
-### Manual Commands
-
-- Start virtual room: `vncserver-virtual`
-- Stop virtual room: `vncserver-virtual -kill :1`
-- Check VNC listener: `sudo ss -ltnp | grep 590`
-
-## Directory Structure
-
-```text
-.
-+-- README.md
-+-- AGENTS.md
-+-- .gitignore
-```
+MIT License. Copyright (c) 2026 Michael Pentz.
